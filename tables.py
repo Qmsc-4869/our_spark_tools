@@ -124,7 +124,7 @@ PARTITIONED BY (dataset_id);""")
 
 #  标注用户信息表
 spark.sql("""
-CREATE TABLE IF NOT EXISTS default.user (
+CREATE TABLE IF NOT EXISTS nessie.db_lowaltitude_vision.annotate_user (
     user_id STRING,          -- id 
     username STRING,         -- 账户名
     role STRING,             -- 管理员 / 标注员 / 审核员
@@ -132,3 +132,15 @@ CREATE TABLE IF NOT EXISTS default.user (
 )
 USING iceberg
 """)
+
+spark.sql("""
+CREATE TABLE IF NOT EXISTS nessie.db_lowaltitude_vision.import_user (
+    user_id STRING,          -- id 
+    username STRING,         -- 姓名
+    import_time timestamp        -- 导入数据集时间
+    last_updated_time timestamp  -- 最近更新时间
+    data_name string            -- 导入数据集名字
+)
+USING iceberg
+""")
+

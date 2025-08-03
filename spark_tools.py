@@ -11,13 +11,14 @@ from minio import Minio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from py4j.protocol import Py4JJavaError
+from pyspark.sql import Window
 
-def add_id(spark: SparkSession, start_id, tabel_name):
-    df = spark.sql(f"""
-        SELECT *, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) + {start_id} AS id, 
-        FROM {tabel_name}
-    """)
-    return df
+def add_id(df, start_id):
+    df = df.withColumn("_partition", F.lit(1))
+    window_spec = Window.partitionBy("_partition").orderBy(F.lit(1))
+    df_with_id = df.withColumn("asset_id", F.row_number().over(window_spec) + start_id) \
+                   .drop("_partition")
+    return df_with_id
 
 def distinct_remain(spark: SparkSession, 
                     col_name, tabel_name) -> pyspark.sql.dataframe.DataFrame:
@@ -29,7 +30,7 @@ def distinct_remain(spark: SparkSession,
             ) t
         WHERE rn = 1
         """) 
-    return df 
+    return df.drop('rn') 
 
 class TreeNode:
         def __init__(self, val, name, col, tmp_view_name=None, data_schema=None, left=None, right=None):
@@ -386,4 +387,24 @@ def merge_current_to_all(spark, current_branch, catalog='nessie'):
                 print(f"{current_branch} → {br} 存在冲突，已跳过")
             else:
                 raise
+
+# 分页查看数据
+def read_table_page(spark, table_name: str, page: int, page_size: int, order_col: str):
+    offset = (page - 1) * page_size
+    df = spark.read.table(table_name)
+    window_spec = Window.orderBy(order_col)
+    df_with_index = df.withColumn("row_num", F.row_number().over(window_spec))
+    paged_df = df_with_index.filter((F.col("row_num") > offset) & (F.col("row_num") <= offset + page_size))
+    paged_df.drop("row_num").show(truncate=False)
+
+# 检测sql表某个字段是否有重复的值
+def check_duplication(spark, tb_name, col_name):
+    has_duplicates = spark.sql(f"""
+        SELECT 1
+        FROM {tb_name}
+        GROUP BY {col_name}
+        HAVING COUNT(*) > 1
+        LIMIT 1
+    """).count() > 0
+    print(f"是否存在_重复值: {has_duplicates}")
 

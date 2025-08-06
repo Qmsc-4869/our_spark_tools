@@ -60,6 +60,7 @@ spark.sql("""CREATE TABLE if not exists nessie.db_lowaltitude_vision.assets (
     frame_rate DOUBLE,               #  帧率（如果是视频）
     timestamp TIMESTAMP,             #  数据采集时间
     location string,                 #  数据采集地点
+    split_name string                #  在原始数据集中的分类类型（train/val/test/undef）
 USING iceberg
 PARTITIONED BY (data_name);""")
 
@@ -77,7 +78,6 @@ PARTITIONED BY (domain);""")
 
 spark.sql("""CREATE TABLE my_catalog.db.annotations (
     annotation_id STRING,               #  使用UUID创建
-    split_name string,                  #  在原始数据集中的分类类型（train/val/test/undef）
     asset_id BIGINT,                    #  对应资产id
     annotation_type STRING,             #  标注类型（如bbox2d/seg_poly/bbox3d等）
     category_id INT,                    #  标注对象所属类别

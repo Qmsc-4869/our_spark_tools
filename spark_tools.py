@@ -213,7 +213,7 @@ def save_data(spark, df, save_path, download_data=True, zip_path=None):
             zip_path = os.path.join(os.path.dirname(save_path), '.'.join([os.path.basename(save_path).split('.')[0], 'zip']))
         df = spark.table("assets")
         paths = [row['uri'] for row in df.select('uri').collect()]
-        file_name = [str(row['asset_id']) for row in df.select('asset_id').collect()]
+        file_name = ['.'.join(row['filename'].split('.')[:-1]) for row in df.select('filename').collect()]
         download_and_zip(paths, zip_path, file_neme=file_name)
 
 # 初始化spark会话
@@ -407,4 +407,14 @@ def check_duplication(spark, tb_name, col_name):
         LIMIT 1
     """).count() > 0
     print(f"是否存在_重复值: {has_duplicates}")
+
+# 获取表tb1, 中col1(int)字段的最大值
+def get_colmax(spark, tb_name, col_name):
+    max_value = spark.sql(f"""
+        SELECT {col_name}
+        FROM {tb_name}
+        ORDER BY {col_name} DESC
+        LIMIT 1
+    """).collect()[0][0]
+    return int(max_value)
 

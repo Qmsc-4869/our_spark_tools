@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from py4j.protocol import Py4JJavaError
 from pyspark.sql import Window
 
+# 添加一列id, start_id + 1为起始
 def add_id(df, start_id):
     df = df.withColumn("_partition", F.lit(1))
     window_spec = Window.partitionBy("_partition").orderBy(F.lit(1))
@@ -417,4 +418,21 @@ def get_colmax(spark, tb_name, col_name):
         LIMIT 1
     """).collect()[0][0]
     return int(max_value)
+
+# 判断df中某个字段是否存在空值
+def check_col_exist_null(df, col_name):
+    has_null = (
+        df.filter((F.col(col_name).isNull()))
+        .limit(1)  
+        .count() > 0
+    )
+    if has_null:
+        print("存在空值")
+    else:
+        print("不存在空值")
+
+# 对某一张表df字段col1进行分组， 聚合字段col2为array类型返回聚合后的结果， 并统计组别中样本数量
+def tb_group_and_collect(df, group_col, collect_col):
+    return df.groupBy(group_col).agg(F.collect_list(collect_col).alias(collect_col), 
+                                     F.count(collect_col).alias("count"))
 

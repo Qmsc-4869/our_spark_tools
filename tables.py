@@ -60,7 +60,6 @@ spark.sql("""CREATE TABLE if not exists nessie.db_lowaltitude_vision.assets (
     frame_rate DOUBLE,               #  帧率（如果是视频）
     timestamp TIMESTAMP,             #  数据采集时间
     location string,                 #  数据采集地点
-    split_name string                #  在原始数据集中的分类类型（train/val/test/undef）
 USING iceberg
 PARTITIONED BY (data_name);""")
 
@@ -78,8 +77,9 @@ PARTITIONED BY (domain);""")
 
 spark.sql("""CREATE TABLE my_catalog.db.annotations (
     annotation_id STRING,               #  使用UUID创建
+    split_name string,                  #  在原始数据集中的分类类型（train/val/test/undef）
     asset_id BIGINT,                    #  对应资产id
-    annotation_type STRING,             #  标注类型（如bbox2d/seg_poly/bbox3d等）
+    annotation_type STRING,             #  标注类型（如bbox2d/seg_poly/bbox3d等） 'seg_mask'
     category_id INT,                    #  标注对象所属类别
     category_ids ARRAY<INT>,            #  用于多标签组
     
@@ -89,9 +89,18 @@ spark.sql("""CREATE TABLE my_catalog.db.annotations (
             y DOUBLE,                   # ymin（正常就是标注框左上点的坐标）
             width DOUBLE,               # 标注框宽
             height DOUBLE,              # 标注框高
-            coord_sys STRING            #  "pixel"/"relative"前者表示以上坐标以像素单位给出；后者则表示使用相对坐标
+            coord_sys STRING            #  "pixel"/"relative"前者表示以上坐标以像素单位给出；
+                                                             后者则表示使用相对坐标
         >,
-        bbox3d STRUCT<                  # 下面的几个类型，根据所遇到的数据集进行分析，如果遇到新的类型请修改表结构增加字段
+        file_ref STRUCT<
+            type string,               
+            file_name string,
+            uri string,
+            width INT,  
+            height int,
+            palette_format            
+        >, 
+        bbox3d STRUCT<                 
             center ARRAY<DOUBLE>,
             size ARRAY<DOUBLE>,
             rotation ARRAY<DOUBLE>,
@@ -115,8 +124,9 @@ PARTITIONED BY (annotation_type);""")
 #  标注分组描述表
 spark.sql("""CREATE TABLE nessie.db_lowaltitude_vision.splits (
     dataset_id INT,             #  数据集id
-    split_name STRING,          #  分组名字（train, val, test）
-    annotation_id ARRAY<INT>    #  标注id列表
+    split_name STRING,          #  分组名字（train, valid, test）
+    asset_ids ARRAY<bigint>,     #  标注id列表
+    count int                    #  组别资产数量
 )
 USING iceberg
 PARTITIONED BY (dataset_id);""")
@@ -124,7 +134,7 @@ PARTITIONED BY (dataset_id);""")
 
 #  标注用户信息表
 spark.sql("""
-CREATE TABLE IF NOT EXISTS nessie.db_lowaltitude_vision.annotate_user (
+CREATE TABLE IF NOT EXISTS db_lowaltitude_vision.annotate_user (
     user_id STRING,          -- id 
     username STRING,         -- 账户名
     role STRING,             -- 管理员 / 标注员 / 审核员
@@ -134,13 +144,11 @@ USING iceberg
 """)
 
 spark.sql("""
-CREATE TABLE IF NOT EXISTS nessie.db_lowaltitude_vision.import_user (
-    user_id STRING,          -- id 
-    username STRING,         -- 姓名
-    import_time timestamp        -- 导入数据集时间
-    last_updated_time timestamp  -- 最近更新时间
-    data_name string            -- 导入数据集名字
+CREATE TABLE IF NOT EXISTS db_lowaltitude_vision.import_user (
+    username string,
+    import_time TIMESTAMP,
+    last_updated_time TIMESTAMP,
+    dataset_name string
 )
 USING iceberg
 """)
-
